@@ -1,5 +1,5 @@
 import { Test, TestingModule } from '@nestjs/testing';
-import { INestApplication } from '@nestjs/common';
+import { INestApplication, ValidationPipe } from '@nestjs/common';
 import * as request from 'supertest';
 import { AppModule } from '../src/app.module';
 import { RecordFormat, RecordCategory } from '../src/api/schemas/record.enum';
@@ -15,6 +15,8 @@ describe('RecordController (e2e)', () => {
     }).compile();
 
     app = moduleFixture.createNestApplication();
+    app.setGlobalPrefix('api'); // Set prefix to match the actual application
+    app.useGlobalPipes(new ValidationPipe());
     recordModel = app.get('RecordModel');
     await app.init();
   });
@@ -31,7 +33,7 @@ describe('RecordController (e2e)', () => {
     };
 
     const response = await request(app.getHttpServer())
-      .post('/records')
+      .post('/api/records')
       .send(createRecordDto)
       .expect(201);
 
@@ -51,18 +53,22 @@ describe('RecordController (e2e)', () => {
     };
 
     const createResponse = await request(app.getHttpServer())
-      .post('/records')
+      .post('/api/records')
       .send(createRecordDto)
       .expect(201);
 
     recordId = createResponse.body._id;
 
     const response = await request(app.getHttpServer())
-      .get('/records?artist=The Fake Band')
+      .get('/api/records?artist=The Fake Band')
       .expect(200);
-    expect(response.body.length).toBe(1);
-    expect(response.body[0]).toHaveProperty('artist', 'The Fake Band');
+    
+    // Response format changed to include pagination
+    expect(response.body.records).toBeDefined();
+    expect(response.body.records.length).toBe(1);
+    expect(response.body.records[0]).toHaveProperty('artist', 'The Fake Band');
   });
+  
   afterEach(async () => {
     if (recordId) {
       await recordModel.findByIdAndDelete(recordId);
