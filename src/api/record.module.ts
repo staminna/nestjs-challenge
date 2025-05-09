@@ -10,5 +10,6 @@ import { RecordSchema } from './schemas/record.schema';
   ],
   controllers: [RecordController],
   providers: [RecordService],
+  exports: [RecordService],
 })
 export class RecordModule {}

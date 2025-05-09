@@ -22,11 +22,14 @@
     "setup:db": "ts-node -r tsconfig-paths/register setup-db.ts"
   },
   "dependencies": {
+    "@nestjs/cache-manager": "^2.3.0",
     "@nestjs/common": "^11.0.0",
+    "@nestjs/config": "^3.3.0",
     "@nestjs/core": "^11.0.0",
     "@nestjs/mongoose": "^11.0.1",
     "@nestjs/platform-express": "^11.0.0",
     "@nestjs/swagger": "^11.0.6",
+    "cache-manager": "^4.1.0",
     "class-transformer": "^0.5.1",
     "class-validator": "^0.14.1",
     "dotenv": "^16.4.7",
@@ -56,7 +59,7 @@
     "ts-loader": "^9.4.3",
     "ts-node": "^10.9.1",
     "tsconfig-paths": "^4.2.0",
-    "typescript": "^5.1.3"
+    "typescript": "^5.3.3"
   },
   "jest": {
     "moduleFileExtensions": [

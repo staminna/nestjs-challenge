@@ -1,7 +1,26 @@
-# Record Store Challenge API
-## Description
+# Record Store API
 
-This is a **NestJS** application starter with MongoDB integration. If necessary, it provides a script to boot a Mongo emulator for Docker. This setup includes end-to-end tests, unit tests, test coverage, linting, and database setup with data from `data.json`.
+## Improvements
+
+### Performance Optimization
+- **MongoDB Indexing**: Added text indexes and field-specific indexes for faster searches
+- **Optimized Queries**: Replaced in-memory filtering with MongoDB query operators
+- **Pagination**: Added pagination support to limit result size and improve response times
+- **Connection Pooling**: Configured optimal connection pool settings for MongoDB
+- **Text Search**: Implemented MongoDB text search for fast full-text searching
+
+### MusicBrainz Integration
+- Auto-fetches detailed record information when a MusicBrainz ID is provided
+- Populates track lists automatically from MusicBrainz data
+- Track information including title, position, and duration is stored with each record
+- Implemented proper rate limiting and error handling for MusicBrainz API calls
+
+### API Enhancements
+- Added proper RESTful endpoints for CRUD operations
+- Improved validation and error handling
+- Enhanced Swagger documentation
+- Added CORS support
+- Added global routing prefix
 
 ## Installation
 

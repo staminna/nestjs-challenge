@@ -7,9 +7,43 @@ import {
   IsInt,
   IsEnum,
   IsOptional,
+  ValidateNested,
+  IsArray,
 } from 'class-validator';
 import { ApiProperty } from '@nestjs/swagger';
 import { RecordFormat, RecordCategory } from '../schemas/record.enum';
+import { Type } from 'class-transformer';
+
+export class TrackDTO {
+  @ApiProperty({
+    description: 'Title of the track',
+    type: String,
+    example: 'Come Together',
+  })
+  @IsString()
+  @IsNotEmpty()
+  title: string;
+
+  @ApiProperty({
+    description: 'Position of the track in the album',
+    type: String,
+    example: 'A1',
+    required: false,
+  })
+  @IsString()
+  @IsOptional()
+  position?: string;
+
+  @ApiProperty({
+    description: 'Duration of the track in milliseconds',
+    type: Number,
+    example: 259733,
+    required: false,
+  })
+  @IsNumber()
+  @IsOptional()
+  duration?: number;
+}
 
 export class CreateRecordRequestDTO {
   @ApiProperty({
@@ -75,4 +109,19 @@ export class CreateRecordRequestDTO {
   })
   @IsOptional()
   mbid?: string;
+
+  @ApiProperty({
+    description: 'List of tracks in the album',
+    type: [TrackDTO],
+    example: [
+      { title: 'Come Together', position: 'A1', duration: 259733 },
+      { title: 'Something', position: 'A2', duration: 181880 },
+    ],
+    required: false,
+  })
+  @IsArray()
+  @ValidateNested({ each: true })
+  @Type(() => TrackDTO)
+  @IsOptional()
+  trackList?: TrackDTO[];
 }

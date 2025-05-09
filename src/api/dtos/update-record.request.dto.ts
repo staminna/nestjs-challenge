@@ -6,9 +6,13 @@ import {
   IsInt,
   IsEnum,
   IsOptional,
+  ValidateNested,
+  IsArray,
 } from 'class-validator';
 import { ApiProperty } from '@nestjs/swagger';
 import { RecordFormat, RecordCategory } from '../schemas/record.enum';
+import { TrackDTO } from './create-record.request.dto';
+import { Type } from 'class-transformer';
 
 export class UpdateRecordRequestDTO {
   @ApiProperty({
@@ -83,4 +87,19 @@ export class UpdateRecordRequestDTO {
   })
   @IsOptional()
   mbid?: string;
+
+  @ApiProperty({
+    description: 'List of tracks in the album',
+    type: [TrackDTO],
+    example: [
+      { title: 'Come Together', position: 'A1', duration: 259733 },
+      { title: 'Something', position: 'A2', duration: 181880 },
+    ],
+    required: false,
+  })
+  @IsArray()
+  @ValidateNested({ each: true })
+  @Type(() => TrackDTO)
+  @IsOptional()
+  trackList?: TrackDTO[];
 }
