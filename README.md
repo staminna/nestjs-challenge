@@ -10,10 +10,14 @@
 - **Text Search**: Implemented MongoDB text search for fast full-text searching
 
 ### MusicBrainz Integration
-- Auto-fetches detailed record information when a MusicBrainz ID is provided
-- Populates track lists automatically from MusicBrainz data
-- Track information including title, position, and duration is stored with each record
-- Implemented proper rate limiting and error handling for MusicBrainz API calls
+- Auto-fetches detailed record information when a MusicBrainz ID (MBID) is provided
+- Automatically populates track lists from MusicBrainz data during record creation and updates
+- Each track includes title, position, and duration information
+- Implements proper rate limiting and error handling for MusicBrainz API calls
+- Caches MusicBrainz data to reduce API calls and improve performance
+- Supports XML response format as required
+- Gracefully handles API failures and continues with record creation/update
+- Provides endpoints to directly fetch MusicBrainz data for a given MBID
 
 ### API Enhancements
 - Added proper RESTful endpoints for CRUD operations
@@ -55,70 +59,5 @@ This will prompt the user to cleanup (Y/N) existing collection before importing 
 
 
 #### data.json Example
-Here’s an example of the data.json file that contains records:
+Here's an example of the data.json file that contains records:
 ```
-[
-    {
-        "artist": "Foo Fighters",
-        "album": "Foo Fighers",
-        "price": 8,
-        "qty": 10,
-        "format": "CD",
-        "category": "Rock",
-        "mbid": "d6591261-daaa-4bb2-81b6-544e499da727"
-  },
-  {
-        "artist": "The Cure",
-        "album": "Disintegration",
-        "price": 23,
-        "qty": 1,
-        "format": "Vinyl",
-        "category": "Alternative",
-        "mbid": "11af85e2-c272-4c59-a902-47f75141dc97"
-  },
-]
-```
-
-### Running the App
-#### Development Mode
-To run the application in development mode (with hot reloading):
-
-```
-npm run start:dev
-```
-#### Production Mode
-To build and run the app in production mode:
-
-```
-npm run start:prod
-```
-
-### Tests
-#### Run Unit Tests
-To run unit tests:
-
-```
-npm run test
-```
-To run unit tests with code coverage:
-
-```
-npm run test:cov
-```
-This will show you how much of your code is covered by the unit tests.
-#### Run End-to-End Tests
-To run end-to-end tests:
-```
-npm run test:e2e
-```
-Run Tests with Coverage
-
-
-Run Linting
-To check if your code passes ESLint checks:
-
-```
-npm run lint
-```
-This command will show you any linting issues with your code.
-
