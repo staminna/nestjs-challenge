@@ -7,6 +7,7 @@ import { CreateRecordRequestDTO } from '../dtos/create-record.request.dto';
 import { UpdateRecordRequestDTO } from '../dtos/update-record.request.dto';
 import { CACHE_MANAGER } from '@nestjs/cache-manager';
 import { Cache } from 'cache-manager';
+import * as xml2js from 'xml2js';
 
 @Injectable()
 export class RecordService {
@@ -205,6 +206,11 @@ export class RecordService {
     return record;
   }
 
+  async fetchMusicBrainzDataPublic(mbid: string): Promise<any> {
+    // This is a public wrapper around the private fetchMusicBrainzData method
+    return this.fetchMusicBrainzData(mbid);
+  }
+
   async delete(id: string): Promise<void> {
     await this.recordModel.findByIdAndDelete(id).exec();
     
@@ -229,11 +235,13 @@ export class RecordService {
       // Add a delay to avoid being blocked
       await this.delay(1000);
       
-      const url = `${this.MUSICBRAINZ_API_BASE}/release/${mbid}?inc=recordings+artists&fmt=json`;
+      // Changed to XML format as specified in the requirements
+      const url = `${this.MUSICBRAINZ_API_BASE}/release/${mbid}?inc=recordings+artists+release-groups+labels+media`;
       
       const response = await fetch(url, {
         headers: {
           'User-Agent': this.USER_AGENT,
+          'Accept': 'application/xml',
         },
       });
       
@@ -241,23 +249,11 @@ export class RecordService {
         throw new Error(`MusicBrainz API responded with status: ${response.status}`);
       }
       
-      const data = await response.json();
+      const xmlText = await response.text();
       
-      // Extract relevant information from MusicBrainz response
-      const trackList = data.media?.length > 0 ? data.media[0].tracks : [];
-      const artist = data['artist-credit']?.length > 0 ? data['artist-credit'][0].name : null;
-      
-      const result = {
-        // Only return fields if they exist in the response
-        ...(artist && { artist }),
-        ...(data.title && { album: data.title }),
-        // Additional data that might be useful for the record model
-        trackList: trackList.map(track => ({
-          title: track.title,
-          duration: track.length,
-          position: track.position,
-        })),
-      };
+      // Parse XML using xml2js
+      const parser = new xml2js.Parser({ explicitArray: false, mergeAttrs: true });
+      const result = await this.parseXmlAndExtractData(parser, xmlText);
 
       // Cache the MusicBrainz data for a day since it rarely changes
       await this.cacheManager.set(cacheKey, result, 60 * 60 * 24);
@@ -265,6 +261,62 @@ export class RecordService {
       return result;
     } catch (error) {
       this.logger.error(`Error fetching from MusicBrainz: ${error.message}`);
+      return null;
+    }
+  }
+
+  private async parseXmlAndExtractData(parser: xml2js.Parser, xmlText: string): Promise<any> {
+    try {
+      const parsedXml = await parser.parseStringPromise(xmlText);
+      
+      // Extract data from parsed XML
+      const release = parsedXml.metadata?.release;
+      if (!release) {
+        throw new Error('No release data found in MusicBrainz response');
+      }
+      
+      // Extract title (album name)
+      const title = release.title || '';
+      
+      // Extract artist
+      let artist = '';
+      if (release['artist-credit'] && release['artist-credit']['name-credit']) {
+        const nameCredit = Array.isArray(release['artist-credit']['name-credit']) 
+          ? release['artist-credit']['name-credit'][0] 
+          : release['artist-credit']['name-credit'];
+          
+        artist = nameCredit.artist?.name || '';
+      }
+      
+      // Extract track list
+      let trackList = [];
+      if (release.media) {
+        const media = Array.isArray(release.media) ? release.media[0] : release.media;
+        if (media && media['track-list'] && media['track-list'].track) {
+          const tracks = Array.isArray(media['track-list'].track) 
+            ? media['track-list'].track 
+            : [media['track-list'].track];
+            
+          trackList = tracks.map(track => {
+            return {
+              title: track.recording?.title || track.title || '',
+              position: track.position || '',
+              duration: track.length ? parseInt(track.length, 10) : 0,
+            };
+          });
+        }
+      }
+      
+      this.logger.log(`Successfully extracted ${trackList.length} tracks from MusicBrainz`);
+      
+      // Return extracted data
+      return {
+        ...(artist && { artist }),
+        ...(title && { album: title }),
+        trackList,
+      };
+    } catch (error) {
+      this.logger.error(`Error parsing MusicBrainz XML: ${error.message}`);
       return null;
     }
   }

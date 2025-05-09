@@ -162,6 +162,19 @@ export class RecordController {
     }
   }
 
+  @Get('mb/fetch/:mbid')
+  @ApiOperation({ summary: 'Fetch and display data from MusicBrainz API for a given MBID' })
+  @ApiResponse({ status: 200, description: 'MusicBrainz data fetched successfully' })
+  @ApiResponse({ status: 404, description: 'MusicBrainz ID not found or invalid' })
+  @ApiParam({ name: 'mbid', description: 'MusicBrainz ID' })
+  async fetchMusicBrainzData(@Param('mbid') mbid: string): Promise<any> {
+    const data = await this.recordService.fetchMusicBrainzDataPublic(mbid);
+    if (!data) {
+      throw new NotFoundException('Failed to fetch data from MusicBrainz or invalid MBID');
+    }
+    return data;
+  }
+
   @Get('mb/:mbid')
   @ApiOperation({ summary: 'Get a record by MusicBrainz ID' })
   @ApiResponse({ status: 200, description: 'Record found' })
