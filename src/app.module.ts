@@ -1,6 +1,7 @@
 import { Module } from '@nestjs/common';
 import { MongooseModule } from '@nestjs/mongoose';
 import { RecordModule } from './api/record.module';
+import { OrderModule } from './api/order.module';
 import { ConfigModule } from '@nestjs/config';
 import { CacheModule } from '@nestjs/cache-manager';
 import { AppConfig, appConfig } from './app.config';
@@ -21,6 +22,7 @@ import { AppConfig, appConfig } from './app.config';
       maxPoolSize: 10,
     }),
     RecordModule,
+    OrderModule,
   ],
   controllers: [],
   providers: [],

@@ -33,7 +33,6 @@ describe('RecordModule', () => {
     get: jest.fn().mockResolvedValue(null),
     set: jest.fn().mockResolvedValue(undefined),
     del: jest.fn().mockResolvedValue(undefined),
-    reset: jest.fn().mockResolvedValue(undefined),
   };
 
   beforeEach(async () => {
@@ -76,6 +75,5 @@ describe('RecordModule', () => {
     expect(typeof cacheManager.get).toBe('function');
     expect(typeof cacheManager.set).toBe('function');
     expect(typeof cacheManager.del).toBe('function');
-    expect(typeof cacheManager.reset).toBe('function');
   });
 }); 

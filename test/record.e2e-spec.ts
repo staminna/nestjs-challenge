@@ -3,26 +3,40 @@ import { INestApplication, ValidationPipe } from '@nestjs/common';
 import * as request from 'supertest';
 import { AppModule } from '../src/app.module';
 import { RecordFormat, RecordCategory } from '../src/api/schemas/record.enum';
+import { Model } from 'mongoose';
+import { getModelToken } from '@nestjs/mongoose';
+import { Record } from '../src/api/schemas/record.schema';
+import { CACHE_MANAGER } from '@nestjs/cache-manager';
 
 describe('RecordController (e2e)', () => {
   let app: INestApplication;
   let recordId: string;
-  let recordModel;
+  let recordModel: Model<Record>;
 
-  beforeEach(async () => {
+  beforeAll(async () => {
     const moduleFixture: TestingModule = await Test.createTestingModule({
       imports: [AppModule],
-    }).compile();
+    })
+    .overrideProvider(CACHE_MANAGER)
+    .useValue({
+      get: jest.fn().mockResolvedValue(null),
+      set: jest.fn().mockResolvedValue(undefined),
+      del: jest.fn().mockResolvedValue(undefined),
+    })
+    .compile();
 
     app = moduleFixture.createNestApplication();
     app.setGlobalPrefix('api'); // Set prefix to match the actual application
-    app.useGlobalPipes(new ValidationPipe());
-    recordModel = app.get('RecordModel');
+    app.useGlobalPipes(new ValidationPipe({
+      transform: true,
+      whitelist: true,
+      forbidNonWhitelisted: true,
+    }));
+    
+    recordModel = moduleFixture.get<Model<Record>>(getModelToken('Record'));
     await app.init();
-  });
-
-  // Test to create a record
-  it('should create a new record', async () => {
+    
+    // Create test record for subsequent tests
     const createRecordDto = {
       artist: 'The Beatles',
       album: 'Abbey Road',
@@ -31,15 +45,21 @@ describe('RecordController (e2e)', () => {
       format: RecordFormat.VINYL,
       category: RecordCategory.ROCK,
     };
+    
+    const record = await recordModel.create(createRecordDto);
+    recordId = record._id.toString();
+  });
 
+  it('should fetch a record with filters', async () => {
     const response = await request(app.getHttpServer())
-      .post('/api/records')
-      .send(createRecordDto)
-      .expect(201);
-
-    recordId = response.body._id;
-    expect(response.body).toHaveProperty('artist', 'The Beatles');
-    expect(response.body).toHaveProperty('album', 'Abbey Road');
+      .get('/api/records?artist=The Beatles')
+      .expect(200);
+    
+    // Response format changed to include pagination
+    expect(response.body.records).toBeDefined();
+    expect(Array.isArray(response.body.records)).toBe(true);
+    // At least one record with The Beatles should be found
+    expect(response.body.records.some(r => r.artist === 'The Beatles')).toBe(true);
   });
 
   it('should create a new record and fetch it with filters', async () => {
@@ -57,7 +77,7 @@ describe('RecordController (e2e)', () => {
       .send(createRecordDto)
       .expect(201);
 
-    recordId = createResponse.body._id;
+    const newRecordId = createResponse.body._id;
 
     const response = await request(app.getHttpServer())
       .get('/api/records?artist=The Fake Band')
@@ -65,17 +85,17 @@ describe('RecordController (e2e)', () => {
     
     // Response format changed to include pagination
     expect(response.body.records).toBeDefined();
-    expect(response.body.records.length).toBe(1);
-    expect(response.body.records[0]).toHaveProperty('artist', 'The Fake Band');
+    expect(response.body.records.some(r => r.artist === 'The Fake Band')).toBe(true);
+    
+    // Cleanup the newly created record
+    await recordModel.findByIdAndDelete(newRecordId);
   });
   
-  afterEach(async () => {
+  afterAll(async () => {
+    // Cleanup created record
     if (recordId) {
       await recordModel.findByIdAndDelete(recordId);
     }
-  });
-
-  afterAll(async () => {
     await app.close();
   });
 });

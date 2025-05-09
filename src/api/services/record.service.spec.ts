@@ -130,7 +130,6 @@ describe('RecordService', () => {
       get: jest.fn().mockResolvedValue(null),
       set: jest.fn().mockResolvedValue(undefined),
       del: jest.fn().mockResolvedValue(undefined),
-      reset: jest.fn().mockResolvedValue(undefined),
     };
 
     const httpServiceMock = {

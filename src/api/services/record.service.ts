@@ -14,6 +14,12 @@ export class RecordService {
   private readonly logger = new Logger(RecordService.name);
   private readonly MUSICBRAINZ_API_BASE = 'http://musicbrainz.org/ws/2';
   private readonly USER_AGENT = 'RecordStore/1.0.0 (contact@example.com)';
+  // Cache keys prefix for easier management
+  private readonly CACHE_PREFIX = {
+    RECORD: 'record:',
+    RECORDS: 'records:',
+    MUSICBRAINZ: 'musicbrainz:',
+  };
 
   constructor(
     @InjectModel('Record') private readonly recordModel: Model<Record>,
@@ -35,8 +41,9 @@ export class RecordService {
       }
     }
 
-    // Invalidate relevant cache keys when creating a new record
-    await this.cacheManager.reset();
+    // Instead of resetting the entire cache, just clear the records list cache
+    // This is a common pattern in cache-manager v6+
+    await this.cacheManager.del(this.CACHE_PREFIX.RECORDS);
     
     return await this.recordModel.create(createRecordDto);
   }
@@ -59,9 +66,15 @@ export class RecordService {
       }
     }
 
-    // Invalidate relevant cache keys when updating a record
-    await this.cacheManager.del(`record:${id}`);
-    await this.cacheManager.reset();
+    // Clear specific cache keys rather than using reset()
+    const recordKey = `${this.CACHE_PREFIX.RECORD}${id}`;
+    await this.cacheManager.del(recordKey);
+    await this.cacheManager.del(this.CACHE_PREFIX.RECORDS);
+    
+    // If MBID exists, also clear the MBID-based cache
+    if (updateRecordDto.mbid) {
+      await this.cacheManager.del(`${this.CACHE_PREFIX.RECORD}mbid:${updateRecordDto.mbid}`);
+    }
 
     return await this.recordModel.findByIdAndUpdate(
       id,
@@ -215,11 +228,17 @@ export class RecordService {
   }
 
   async delete(id: string): Promise<void> {
+    const record = await this.recordModel.findById(id).lean().exec();
     await this.recordModel.findByIdAndDelete(id).exec();
     
-    // Invalidate cache when deleting a record
-    await this.cacheManager.del(`record:${id}`);
-    await this.cacheManager.reset();
+    // Clear specific cache entries instead of using reset()
+    await this.cacheManager.del(`${this.CACHE_PREFIX.RECORD}${id}`);
+    await this.cacheManager.del(this.CACHE_PREFIX.RECORDS);
+    
+    // If record has an MBID, also clear that cache
+    if (record?.mbid) {
+      await this.cacheManager.del(`${this.CACHE_PREFIX.RECORD}mbid:${record.mbid}`);
+    }
   }
 
   // MusicBrainz integration
