@@ -42,17 +42,20 @@ export class RecordService {
   }
 
   async update(id: string, updateRecordDto: UpdateRecordRequestDTO): Promise<Record> {
-    // If MBID is provided and it has changed, try to get album details from MusicBrainz
+    // If MBID is provided, check if it's different from the current one
     if (updateRecordDto.mbid) {
-      try {
-        const mbData = await this.fetchMusicBrainzData(updateRecordDto.mbid);
-        if (mbData) {
-          // Merge MusicBrainz data with the DTO data
-          Object.assign(updateRecordDto, mbData);
+      const currentRecord = await this.recordModel.findById(id).lean().exec();
+      if (currentRecord && currentRecord.mbid !== updateRecordDto.mbid) {
+        try {
+          const mbData = await this.fetchMusicBrainzData(updateRecordDto.mbid);
+          if (mbData) {
+            // Merge MusicBrainz data with the DTO data
+            Object.assign(updateRecordDto, mbData);
+          }
+        } catch (error) {
+          this.logger.error(`Error fetching MusicBrainz data: ${error.message}`);
+          // Continue with update even if MusicBrainz fetch fails
         }
-      } catch (error) {
-        this.logger.error(`Error fetching MusicBrainz data: ${error.message}`);
-        // Continue with update even if MusicBrainz fetch fails
       }
     }
 

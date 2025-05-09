@@ -80,7 +80,7 @@ describe('MusicBrainz Integration (e2e)', () => {
     expect(response.body.trackList[0]).toHaveProperty('title', 'Plainsong');
   });
 
-  it('should update a record with new MusicBrainz data', async () => {
+  it('should update a record with new MusicBrainz data when MBID changes', async () => {
     // First, let's modify our mock to return different data
     (recordService as any).fetchMusicBrainzData.mockResolvedValueOnce({
       artist: 'The Cure',
@@ -93,10 +93,10 @@ describe('MusicBrainz Integration (e2e)', () => {
       ],
     });
 
-    // Now update the record
+    // Now update the record with a new MBID
     const updateRecordDto = {
       price: 30, // Change price
-      mbid, // Same MBID, but we'll mock different data
+      mbid: 'new-mbid-123', // New MBID
     };
 
     const response = await request(app.getHttpServer())
@@ -106,10 +106,37 @@ describe('MusicBrainz Integration (e2e)', () => {
 
     // Verify the update
     expect(response.body).toHaveProperty('price', 30);
+    expect(response.body).toHaveProperty('mbid', 'new-mbid-123');
     expect(response.body).toHaveProperty('trackList');
     expect(response.body.trackList).toBeInstanceOf(Array);
     expect(response.body.trackList.length).toBe(4); // Should have 4 tracks now
     expect(response.body.trackList[3]).toHaveProperty('title', 'Lovesong');
+  });
+
+  it('should not fetch MusicBrainz data when MBID is unchanged', async () => {
+    // Mock the fetchMusicBrainzData method to verify it's not called
+    const fetchSpy = jest.spyOn(recordService as any, 'fetchMusicBrainzData');
+
+    // Update the record with the same MBID
+    const updateRecordDto = {
+      price: 35, // Change price
+      mbid, // Same MBID
+    };
+
+    const response = await request(app.getHttpServer())
+      .put(`/api/records/${createdRecordId}`)
+      .send(updateRecordDto)
+      .expect(200);
+
+    // Verify the update
+    expect(response.body).toHaveProperty('price', 35);
+    expect(response.body).toHaveProperty('mbid', mbid);
+    expect(response.body).toHaveProperty('trackList');
+    expect(response.body.trackList).toBeInstanceOf(Array);
+    expect(response.body.trackList.length).toBe(3); // Should still have 3 tracks
+
+    // Verify that fetchMusicBrainzData was not called
+    expect(fetchSpy).not.toHaveBeenCalled();
   });
 
   it('should fetch MusicBrainz data directly via endpoint', async () => {
