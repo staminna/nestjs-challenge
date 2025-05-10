@@ -49,7 +49,7 @@ describe('Order Schema', () => {
     const invalidOrder1 = new model({
       quantity: 2,
     });
-    
+
     await expect(invalidOrder1.validate()).rejects.toThrow();
 
     // Test with invalid quantity (zero)
@@ -57,7 +57,7 @@ describe('Order Schema', () => {
       recordId: new mongoose.Types.ObjectId(),
       quantity: 0,
     });
-    
+
     await expect(invalidOrder2.validate()).rejects.toThrow();
   });
-}); 
+});

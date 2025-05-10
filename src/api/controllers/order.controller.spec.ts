@@ -47,7 +47,7 @@ describe('OrderController', () => {
         _id: mockOrderId,
         recordId: mockRecordId,
         quantity: 2,
-        created: new Date()
+        created: new Date(),
       } as Order;
 
       jest.spyOn(orderService, 'create').mockResolvedValue(mockOrder);
@@ -67,10 +67,14 @@ describe('OrderController', () => {
         quantity: 2,
       };
 
-      jest.spyOn(orderService, 'create').mockRejectedValue(new NotFoundException('Record not found'));
+      jest
+        .spyOn(orderService, 'create')
+        .mockRejectedValue(new NotFoundException('Record not found'));
 
       // Act & Assert
-      await expect(controller.create(createOrderDto)).rejects.toThrow(NotFoundException);
+      await expect(controller.create(createOrderDto)).rejects.toThrow(
+        NotFoundException,
+      );
     });
 
     it('should handle insufficient stock error', async () => {
@@ -80,10 +84,14 @@ describe('OrderController', () => {
         quantity: 2,
       };
 
-      jest.spyOn(orderService, 'create').mockRejectedValue(new Error('Not enough records in stock'));
+      jest
+        .spyOn(orderService, 'create')
+        .mockRejectedValue(new Error('Not enough records in stock'));
 
       // Act & Assert
-      await expect(controller.create(createOrderDto)).rejects.toThrow(BadRequestException);
+      await expect(controller.create(createOrderDto)).rejects.toThrow(
+        BadRequestException,
+      );
     });
   });
 
@@ -91,8 +99,18 @@ describe('OrderController', () => {
     it('should return all orders', async () => {
       // Arrange
       const mockOrders = [
-        { _id: mockOrderId, recordId: mockRecordId, quantity: 2, created: new Date() } as Order,
-        { _id: new mongoose.Types.ObjectId().toString(), recordId: mockRecordId, quantity: 3, created: new Date() } as Order,
+        {
+          _id: mockOrderId,
+          recordId: mockRecordId,
+          quantity: 2,
+          created: new Date(),
+        } as Order,
+        {
+          _id: new mongoose.Types.ObjectId().toString(),
+          recordId: mockRecordId,
+          quantity: 3,
+          created: new Date(),
+        } as Order,
       ];
 
       jest.spyOn(orderService, 'findAll').mockResolvedValue(mockOrders);
@@ -109,11 +127,11 @@ describe('OrderController', () => {
   describe('findOne', () => {
     it('should return an order by id', async () => {
       // Arrange
-      const mockOrder = { 
-        _id: mockOrderId, 
-        recordId: mockRecordId, 
-        quantity: 2, 
-        created: new Date() 
+      const mockOrder = {
+        _id: mockOrderId,
+        recordId: mockRecordId,
+        quantity: 2,
+        created: new Date(),
       } as Order;
 
       jest.spyOn(orderService, 'findOne').mockResolvedValue(mockOrder);
@@ -131,7 +149,9 @@ describe('OrderController', () => {
       jest.spyOn(orderService, 'findOne').mockResolvedValue(null);
 
       // Act & Assert
-      await expect(controller.findOne(mockOrderId)).rejects.toThrow(NotFoundException);
+      await expect(controller.findOne(mockOrderId)).rejects.toThrow(
+        NotFoundException,
+      );
     });
   });
-}); 
+});

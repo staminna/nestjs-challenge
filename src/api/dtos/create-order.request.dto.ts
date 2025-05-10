@@ -19,4 +19,4 @@ export class CreateOrderRequestDTO {
   @IsNumber()
   @Min(1)
   quantity: number;
-} 
+}

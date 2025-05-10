@@ -74,7 +74,7 @@ describe('OrderService', () => {
         ...record,
         qty: record.qty - createOrderDto.quantity,
       });
-      
+
       orderModel.create = jest.fn().mockResolvedValue(order);
 
       // Act
@@ -82,10 +82,9 @@ describe('OrderService', () => {
 
       // Assert
       expect(recordModel.findById).toHaveBeenCalledWith(mockRecordId);
-      expect(recordModel.findByIdAndUpdate).toHaveBeenCalledWith(
-        mockRecordId,
-        { $inc: { qty: -createOrderDto.quantity } }
-      );
+      expect(recordModel.findByIdAndUpdate).toHaveBeenCalledWith(mockRecordId, {
+        $inc: { qty: -createOrderDto.quantity },
+      });
       expect(orderModel.create).toHaveBeenCalledWith(createOrderDto);
       expect(result).toEqual({
         _id: mockOrderId,
@@ -104,7 +103,9 @@ describe('OrderService', () => {
       recordModel.findById = jest.fn().mockResolvedValue(null);
 
       // Act & Assert
-      await expect(service.create(createOrderDto)).rejects.toThrow(NotFoundException);
+      await expect(service.create(createOrderDto)).rejects.toThrow(
+        NotFoundException,
+      );
     });
 
     it('should throw Error when record has insufficient stock', async () => {
@@ -124,7 +125,9 @@ describe('OrderService', () => {
       recordModel.findById = jest.fn().mockResolvedValue(record);
 
       // Act & Assert
-      await expect(service.create(createOrderDto)).rejects.toThrow('Not enough records in stock');
+      await expect(service.create(createOrderDto)).rejects.toThrow(
+        'Not enough records in stock',
+      );
     });
   });
 
@@ -133,7 +136,11 @@ describe('OrderService', () => {
       // Arrange
       const orders = [
         { _id: mockOrderId, recordId: mockRecordId, quantity: 2 },
-        { _id: new mongoose.Types.ObjectId().toString(), recordId: mockRecordId, quantity: 3 },
+        {
+          _id: new mongoose.Types.ObjectId().toString(),
+          recordId: mockRecordId,
+          quantity: 3,
+        },
       ];
 
       const findMock = {
@@ -185,4 +192,4 @@ describe('OrderService', () => {
       expect(result).toBeNull();
     });
   });
-}); 
+});

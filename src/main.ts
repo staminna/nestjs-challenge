@@ -11,7 +11,12 @@ async function bootstrap() {
   });
 
   // Enable CORS
-  app.enableCors();
+  app.enableCors({
+    origin: 'http://localhost:3001', // Your Next.js frontend URL
+    methods: ['GET', 'POST', 'PUT', 'DELETE', 'OPTIONS'],
+    allowedHeaders: ['Content-Type', 'Authorization'],
+    credentials: true,
+  });
 
   // Global validation pipe
   app.useGlobalPipes(
@@ -41,8 +46,12 @@ async function bootstrap() {
   app.setGlobalPrefix('api');
 
   await app.listen(AppConfig.port);
-  logger.log(`Application is running on: http://localhost:${AppConfig.port}/api`);
-  logger.log(`Swagger documentation: http://localhost:${AppConfig.port}/api/docs`);
+  logger.log(
+    `Application is running on: http://localhost:${AppConfig.port}/api`,
+  );
+  logger.log(
+    `Swagger documentation: http://localhost:${AppConfig.port}/api/docs`,
+  );
 }
 
 bootstrap();

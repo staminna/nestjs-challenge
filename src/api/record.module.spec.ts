@@ -1,14 +1,11 @@
 import { Test, TestingModule } from '@nestjs/testing';
-import { RecordModule } from './record.module';
 import { RecordController } from './controllers/record.controller';
 import { RecordService } from './services/record.service';
 import { getModelToken } from '@nestjs/mongoose';
 import { CACHE_MANAGER } from '@nestjs/cache-manager';
-import { Model } from 'mongoose';
 import { Record } from './schemas/record.schema';
 import { CacheModule } from '@nestjs/cache-manager';
 import { HttpModule } from '@nestjs/axios';
-import { MongooseModule } from '@nestjs/mongoose';
 
 describe('RecordModule', () => {
   let module: TestingModule;
@@ -20,11 +17,11 @@ describe('RecordModule', () => {
       lean: jest.fn().mockReturnThis(),
       skip: jest.fn().mockReturnThis(),
       limit: jest.fn().mockReturnThis(),
-      exec: jest.fn().mockResolvedValue([])
+      exec: jest.fn().mockResolvedValue([]),
     }),
     findById: jest.fn().mockReturnValue({
       lean: jest.fn().mockReturnThis(),
-      exec: jest.fn().mockResolvedValue({})
+      exec: jest.fn().mockResolvedValue({}),
     }),
     create: jest.fn().mockResolvedValue({}),
   };
@@ -37,16 +34,14 @@ describe('RecordModule', () => {
 
   beforeEach(async () => {
     module = await Test.createTestingModule({
-      imports: [
-        CacheModule.register(),
-        HttpModule,
-      ],
+      imports: [CacheModule.register(), HttpModule],
       providers: [
         RecordService,
         {
           provide: getModelToken(Record.name),
           useValue: mockModel,
         },
+        RecordSeeder,
       ],
       controllers: [RecordController],
     })
@@ -76,4 +71,4 @@ describe('RecordModule', () => {
     expect(typeof cacheManager.set).toBe('function');
     expect(typeof cacheManager.del).toBe('function');
   });
-}); 
+});

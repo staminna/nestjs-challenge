@@ -22,17 +22,19 @@ describe('Order API (e2e)', () => {
 
     app = moduleFixture.createNestApplication();
     app.setGlobalPrefix('api'); // Add the API prefix to match the main app
-    app.useGlobalPipes(new ValidationPipe({
-      transform: true,
-      whitelist: true,
-      forbidNonWhitelisted: true,
-    }));
-    
+    app.useGlobalPipes(
+      new ValidationPipe({
+        transform: true,
+        whitelist: true,
+        forbidNonWhitelisted: true,
+      }),
+    );
+
     recordModel = moduleFixture.get<Model<Record>>(getModelToken('Record'));
     orderModel = moduleFixture.get<Model<Order>>(getModelToken('Order'));
-    
+
     await app.init();
-    
+
     // Create a test record for orders
     const record = await recordModel.create({
       artist: 'Test Artist',
@@ -42,7 +44,7 @@ describe('Order API (e2e)', () => {
       format: RecordFormat.VINYL,
       category: RecordCategory.ROCK,
     });
-    
+
     recordId = record._id.toString();
   });
 
@@ -67,9 +69,9 @@ describe('Order API (e2e)', () => {
     expect(response.body).toHaveProperty('recordId', recordId);
     expect(response.body).toHaveProperty('quantity', 2);
     expect(response.body).toHaveProperty('_id');
-    
+
     orderId = response.body._id;
-    
+
     // Verify record quantity was updated
     const updatedRecord = await recordModel.findById(recordId);
     expect(updatedRecord.qty).toBe(8); // Initial 10 - 2 ordered
@@ -81,19 +83,19 @@ describe('Order API (e2e)', () => {
       .post('/api/orders')
       .send({ quantity: 1 })
       .expect(400);
-    
+
     // Invalid recordId format
     await request(app.getHttpServer())
       .post('/api/orders')
       .send({ recordId: 'invalid-id', quantity: 1 })
       .expect(400);
-    
+
     // Zero quantity
     await request(app.getHttpServer())
       .post('/api/orders')
       .send({ recordId, quantity: 0 })
       .expect(400);
-    
+
     // Non-existent record
     const nonExistentId = '60d21b4667d0d8992e610c85';
     await request(app.getHttpServer())
@@ -137,4 +139,4 @@ describe('Order API (e2e)', () => {
       .get(`/api/orders/${nonExistentId}`)
       .expect(404);
   });
-}); 
+});

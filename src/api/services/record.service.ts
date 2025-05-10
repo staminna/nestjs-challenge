@@ -1,4 +1,4 @@
-import { Injectable, Logger, Inject } from '@nestjs/common';
+import { Injectable, Logger, Inject, ConflictException } from '@nestjs/common';
 import { InjectModel } from '@nestjs/mongoose';
 import { Model } from 'mongoose';
 import { Record } from '../schemas/record.schema';
@@ -27,6 +27,20 @@ export class RecordService {
   ) {}
 
   async create(createRecordDto: CreateRecordRequestDTO): Promise<Record> {
+    // Check for existing record with same title and artist
+    const existingRecord = await this.recordModel
+      .findOne({
+        title: createRecordDto.album,
+        artist: createRecordDto.artist,
+      })
+      .exec();
+
+    if (existingRecord) {
+      throw new ConflictException(
+        'A record with this title and artist already exists',
+      );
+    }
+
     // If MBID is provided, try to get album details from MusicBrainz
     if (createRecordDto.mbid) {
       try {
@@ -42,13 +56,15 @@ export class RecordService {
     }
 
     // Instead of resetting the entire cache, just clear the records list cache
-    // This is a common pattern in cache-manager v6+
     await this.cacheManager.del(this.CACHE_PREFIX.RECORDS);
-    
+
     return await this.recordModel.create(createRecordDto);
   }
 
-  async update(id: string, updateRecordDto: UpdateRecordRequestDTO): Promise<Record> {
+  async update(
+    id: string,
+    updateRecordDto: UpdateRecordRequestDTO,
+  ): Promise<Record> {
     // If MBID is provided, check if it's different from the current one
     if (updateRecordDto.mbid) {
       const currentRecord = await this.recordModel.findById(id).lean().exec();
@@ -60,7 +76,9 @@ export class RecordService {
             Object.assign(updateRecordDto, mbData);
           }
         } catch (error) {
-          this.logger.error(`Error fetching MusicBrainz data: ${error.message}`);
+          this.logger.error(
+            `Error fetching MusicBrainz data: ${error.message}`,
+          );
           // Continue with update even if MusicBrainz fetch fails
         }
       }
@@ -70,16 +88,18 @@ export class RecordService {
     const recordKey = `${this.CACHE_PREFIX.RECORD}${id}`;
     await this.cacheManager.del(recordKey);
     await this.cacheManager.del(this.CACHE_PREFIX.RECORDS);
-    
+
     // If MBID exists, also clear the MBID-based cache
     if (updateRecordDto.mbid) {
-      await this.cacheManager.del(`${this.CACHE_PREFIX.RECORD}mbid:${updateRecordDto.mbid}`);
+      await this.cacheManager.del(
+        `${this.CACHE_PREFIX.RECORD}mbid:${updateRecordDto.mbid}`,
+      );
     }
 
     return await this.recordModel.findByIdAndUpdate(
       id,
       { ...updateRecordDto, lastModified: new Date() },
-      { new: true }
+      { new: true },
     );
   }
 
@@ -87,7 +107,7 @@ export class RecordService {
     // Try to get from cache first
     const cacheKey = `record:${id}`;
     const cachedRecord = await this.cacheManager.get<Record>(cacheKey);
-    
+
     if (cachedRecord) {
       this.logger.log(`Cache hit for record ${id}`);
       return cachedRecord;
@@ -95,11 +115,11 @@ export class RecordService {
 
     // If not in cache, get from database and store in cache
     const record = await this.recordModel.findById(id).lean().exec();
-    
+
     if (record) {
       await this.cacheManager.set(cacheKey, record, 60 * 5); // Cache for 5 minutes
     }
-    
+
     return record;
   }
 
@@ -112,10 +132,15 @@ export class RecordService {
     page = 1,
     limit = 20,
     fields?: string,
-  ): Promise<{ records: Record[]; total: number; page: number; totalPages: number }> {
+  ): Promise<{
+    records: Record[];
+    total: number;
+    page: number;
+    totalPages: number;
+  }> {
     // Generate a cache key based on query parameters
     const cacheKey = `records:${q || ''}:${artist || ''}:${album || ''}:${format || ''}:${category || ''}:${page}:${limit}:${fields || ''}`;
-    
+
     // Try to get from cache first
     const cachedResult = await this.cacheManager.get(cacheKey);
     if (cachedResult) {
@@ -164,8 +189,9 @@ export class RecordService {
     try {
       // Use Promise.all to run queries in parallel
       const [records, total] = await Promise.all([
-        this.recordModel.find(query, projection)
-          .lean()  // Convert Mongoose docs to plain objects (much faster, less memory)
+        this.recordModel
+          .find(query, projection)
+          .lean() // Convert Mongoose docs to plain objects (much faster, less memory)
           .skip(skip)
           .limit(limit)
           .exec(),
@@ -193,7 +219,7 @@ export class RecordService {
     // Try to get from cache first
     const cacheKey = `record:mbid:${mbid}`;
     const cachedRecord = await this.cacheManager.get<Record>(cacheKey);
-    
+
     if (cachedRecord) {
       this.logger.log(`Cache hit for MBID ${mbid}`);
       return cachedRecord;
@@ -201,11 +227,11 @@ export class RecordService {
 
     // If not in cache, get from database and store in cache
     const record = await this.recordModel.findOne({ mbid }).lean().exec();
-    
+
     if (record) {
       await this.cacheManager.set(cacheKey, record, 60 * 5); // Cache for 5 minutes
     }
-    
+
     return record;
   }
 
@@ -217,14 +243,16 @@ export class RecordService {
   async delete(id: string): Promise<void> {
     const record = await this.recordModel.findById(id).lean().exec();
     await this.recordModel.findByIdAndDelete(id).exec();
-    
+
     // Clear specific cache entries instead of using reset()
     await this.cacheManager.del(`${this.CACHE_PREFIX.RECORD}${id}`);
     await this.cacheManager.del(this.CACHE_PREFIX.RECORDS);
-    
+
     // If record has an MBID, also clear that cache
     if (record?.mbid) {
-      await this.cacheManager.del(`${this.CACHE_PREFIX.RECORD}mbid:${record.mbid}`);
+      await this.cacheManager.del(
+        `${this.CACHE_PREFIX.RECORD}mbid:${record.mbid}`,
+      );
     }
   }
 
@@ -233,7 +261,7 @@ export class RecordService {
     // Try to get from cache first to reduce API calls
     const cacheKey = `musicbrainz:${mbid}`;
     const cachedData = await this.cacheManager.get(cacheKey);
-    
+
     if (cachedData) {
       this.logger.log(`Cache hit for MusicBrainz data ${mbid}`);
       return cachedData;
@@ -243,30 +271,35 @@ export class RecordService {
       // MusicBrainz API has rate limiting, so we need to be careful with requests
       // Add a delay to avoid being blocked
       await this.delay(1000);
-      
+
       // Changed to XML format as specified in the requirements
       const url = `${this.MUSICBRAINZ_API_BASE}/release/${mbid}?inc=recordings+artists+release-groups+labels+media`;
-      
+
       const response = await fetch(url, {
         headers: {
           'User-Agent': this.USER_AGENT,
-          'Accept': 'application/xml',
+          Accept: 'application/xml',
         },
       });
-      
+
       if (!response.ok) {
-        throw new Error(`MusicBrainz API responded with status: ${response.status}`);
+        throw new Error(
+          `MusicBrainz API responded with status: ${response.status}`,
+        );
       }
-      
+
       const xmlText = await response.text();
-      
+
       // Parse XML using xml2js
-      const parser = new xml2js.Parser({ explicitArray: false, mergeAttrs: true });
+      const parser = new xml2js.Parser({
+        explicitArray: false,
+        mergeAttrs: true,
+      });
       const result = await this.parseXmlAndExtractData(parser, xmlText);
 
       // Cache the MusicBrainz data for a day since it rarely changes
       await this.cacheManager.set(cacheKey, result, 60 * 60 * 24);
-      
+
       return result;
     } catch (error) {
       this.logger.error(`Error fetching from MusicBrainz: ${error.message}`);
@@ -274,39 +307,46 @@ export class RecordService {
     }
   }
 
-  private async parseXmlAndExtractData(parser: xml2js.Parser, xmlText: string): Promise<any> {
+  private async parseXmlAndExtractData(
+    parser: xml2js.Parser,
+    xmlText: string,
+  ): Promise<any> {
     try {
       const parsedXml = await parser.parseStringPromise(xmlText);
-      
+
       // Extract data from parsed XML
       const release = parsedXml.metadata?.release;
       if (!release) {
         throw new Error('No release data found in MusicBrainz response');
       }
-      
+
       // Extract title (album name)
       const title = release.title || '';
-      
+
       // Extract artist
       let artist = '';
       if (release['artist-credit'] && release['artist-credit']['name-credit']) {
-        const nameCredit = Array.isArray(release['artist-credit']['name-credit']) 
-          ? release['artist-credit']['name-credit'][0] 
+        const nameCredit = Array.isArray(
+          release['artist-credit']['name-credit'],
+        )
+          ? release['artist-credit']['name-credit'][0]
           : release['artist-credit']['name-credit'];
-          
+
         artist = nameCredit.artist?.name || '';
       }
-      
+
       // Extract track list
       let trackList = [];
       if (release.media) {
-        const media = Array.isArray(release.media) ? release.media[0] : release.media;
+        const media = Array.isArray(release.media)
+          ? release.media[0]
+          : release.media;
         if (media && media['track-list'] && media['track-list'].track) {
-          const tracks = Array.isArray(media['track-list'].track) 
-            ? media['track-list'].track 
+          const tracks = Array.isArray(media['track-list'].track)
+            ? media['track-list'].track
             : [media['track-list'].track];
-            
-          trackList = tracks.map(track => {
+
+          trackList = tracks.map((track) => {
             return {
               title: track.recording?.title || track.title || '',
               position: track.position || '',
@@ -315,9 +355,11 @@ export class RecordService {
           });
         }
       }
-      
-      this.logger.log(`Successfully extracted ${trackList.length} tracks from MusicBrainz`);
-      
+
+      this.logger.log(
+        `Successfully extracted ${trackList.length} tracks from MusicBrainz`,
+      );
+
       // Return extracted data
       return {
         ...(artist && { artist }),
@@ -331,7 +373,7 @@ export class RecordService {
   }
 
   private delay(ms: number): Promise<void> {
-    return new Promise(resolve => setTimeout(resolve, ms));
+    return new Promise((resolve) => setTimeout(resolve, ms));
   }
 
   async createTextIndex() {
@@ -340,5 +382,9 @@ export class RecordService {
     } catch (error) {
       this.logger.error(`Error with text index: ${error.message}`);
     }
+  }
+
+  async findAllNoPagination() {
+    return this.recordModel.find().lean().exec();
   }
 }

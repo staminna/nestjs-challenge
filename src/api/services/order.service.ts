@@ -15,24 +15,23 @@ export class OrderService {
   async create(createOrderDto: CreateOrderRequestDTO): Promise<Order> {
     // Check if the record exists and has enough stock
     const record = await this.recordModel.findById(createOrderDto.recordId);
-    
+
     if (!record) {
       throw new NotFoundException('Record not found');
     }
-    
+
     if (record.qty < createOrderDto.quantity) {
       throw new Error('Not enough records in stock');
     }
-    
+
     // Create the order
     const createdOrder = await this.orderModel.create(createOrderDto);
-    
+
     // Update the record's stock
-    await this.recordModel.findByIdAndUpdate(
-      createOrderDto.recordId,
-      { $inc: { qty: -createOrderDto.quantity } }
-    );
-    
+    await this.recordModel.findByIdAndUpdate(createOrderDto.recordId, {
+      $inc: { qty: -createOrderDto.quantity },
+    });
+
     return createdOrder;
   }
 
@@ -43,4 +42,4 @@ export class OrderService {
   async findOne(id: string): Promise<Order> {
     return this.orderModel.findById(id).exec();
   }
-} 
+}

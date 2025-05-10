@@ -75,7 +75,9 @@ export class RecordController {
   }
 
   @Get()
-  @ApiOperation({ summary: 'Get all records with optional filters and pagination' })
+  @ApiOperation({
+    summary: 'Get all records with optional filters and pagination',
+  })
   @ApiResponse({
     status: 200,
     description: 'List of records',
@@ -128,7 +130,8 @@ export class RecordController {
   @ApiQuery({
     name: 'fields',
     required: false,
-    description: 'Comma-separated list of fields to include (e.g., artist,album,price)',
+    description:
+      'Comma-separated list of fields to include (e.g., artist,album,price)',
     type: String,
   })
   async findAll(
@@ -143,7 +146,9 @@ export class RecordController {
   ) {
     // Validate and sanitize pagination parameters
     const pageNum = page ? Math.max(1, parseInt(page.toString())) : 1;
-    const limitNum = limit ? Math.min(100, Math.max(1, parseInt(limit.toString()))) : 20;
+    const limitNum = limit
+      ? Math.min(100, Math.max(1, parseInt(limit.toString())))
+      : 20;
 
     try {
       return await this.recordService.findAll(
@@ -163,14 +168,24 @@ export class RecordController {
   }
 
   @Get('mb/fetch/:mbid')
-  @ApiOperation({ summary: 'Fetch and display data from MusicBrainz API for a given MBID' })
-  @ApiResponse({ status: 200, description: 'MusicBrainz data fetched successfully' })
-  @ApiResponse({ status: 404, description: 'MusicBrainz ID not found or invalid' })
+  @ApiOperation({
+    summary: 'Fetch and display data from MusicBrainz API for a given MBID',
+  })
+  @ApiResponse({
+    status: 200,
+    description: 'MusicBrainz data fetched successfully',
+  })
+  @ApiResponse({
+    status: 404,
+    description: 'MusicBrainz ID not found or invalid',
+  })
   @ApiParam({ name: 'mbid', description: 'MusicBrainz ID' })
   async fetchMusicBrainzData(@Param('mbid') mbid: string): Promise<any> {
     const data = await this.recordService.fetchMusicBrainzDataPublic(mbid);
     if (!data) {
-      throw new NotFoundException('Failed to fetch data from MusicBrainz or invalid MBID');
+      throw new NotFoundException(
+        'Failed to fetch data from MusicBrainz or invalid MBID',
+      );
     }
     return data;
   }

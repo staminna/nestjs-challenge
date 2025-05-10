@@ -22,27 +22,29 @@ describe('MusicBrainz Integration (e2e)', () => {
     const moduleFixture: TestingModule = await Test.createTestingModule({
       imports: [AppModule],
     })
-    .overrideProvider(CACHE_MANAGER)
-    .useValue({
-      get: jest.fn().mockResolvedValue(null),
-      set: jest.fn().mockResolvedValue(undefined),
-      del: jest.fn().mockResolvedValue(undefined),
-    })
-    .compile();
+      .overrideProvider(CACHE_MANAGER)
+      .useValue({
+        get: jest.fn().mockResolvedValue(null),
+        set: jest.fn().mockResolvedValue(undefined),
+        del: jest.fn().mockResolvedValue(undefined),
+      })
+      .compile();
 
     app = moduleFixture.createNestApplication();
     app.setGlobalPrefix('api'); // Add the API prefix to match the main app
-    app.useGlobalPipes(new ValidationPipe({
-      transform: true,
-      whitelist: true,
-      forbidNonWhitelisted: true,
-    }));
-    
+    app.useGlobalPipes(
+      new ValidationPipe({
+        transform: true,
+        whitelist: true,
+        forbidNonWhitelisted: true,
+      }),
+    );
+
     recordService = moduleFixture.get<RecordService>(RecordService);
     recordModel = moduleFixture.get<Model<Record>>(getModelToken('Record'));
-    
+
     await app.init();
-    
+
     // Mock the fetchMusicBrainzData method to avoid real API calls
     jest.spyOn(recordService as any, 'fetchMusicBrainzData').mockResolvedValue({
       artist: 'The Cure',
@@ -74,7 +76,7 @@ describe('MusicBrainz Integration (e2e)', () => {
     if (createdRecordId) {
       await recordModel.findByIdAndDelete(createdRecordId);
     }
-    
+
     await app.close();
   });
 
@@ -114,7 +116,7 @@ describe('MusicBrainz Integration (e2e)', () => {
   it('should not fetch MusicBrainz data when MBID is unchanged', async () => {
     // Clear all previous calls to the method
     jest.clearAllMocks();
-    
+
     // Mock the fetchMusicBrainzData method to verify it's not called
     const fetchSpy = jest.spyOn(recordService as any, 'fetchMusicBrainzData');
 
@@ -141,14 +143,16 @@ describe('MusicBrainz Integration (e2e)', () => {
 
   it('should fetch MusicBrainz data directly via endpoint', async () => {
     // Mock the public method this time
-    jest.spyOn(recordService, 'fetchMusicBrainzDataPublic').mockResolvedValueOnce({
-      artist: 'The Cure',
-      album: 'Disintegration',
-      trackList: [
-        { title: 'Plainsong', position: '1', duration: 312345 },
-        { title: 'Pictures of You', position: '2', duration: 438543 },
-      ],
-    });
+    jest
+      .spyOn(recordService, 'fetchMusicBrainzDataPublic')
+      .mockResolvedValueOnce({
+        artist: 'The Cure',
+        album: 'Disintegration',
+        trackList: [
+          { title: 'Plainsong', position: '1', duration: 312345 },
+          { title: 'Pictures of You', position: '2', duration: 438543 },
+        ],
+      });
 
     const response = await request(app.getHttpServer())
       .get(`/api/records/mb/fetch/${mbid}`)
@@ -165,7 +169,7 @@ describe('MusicBrainz Integration (e2e)', () => {
   it('should find a record by MBID', async () => {
     // Update the record in database with the original MBID for this test
     await recordModel.findByIdAndUpdate(createdRecordId, { mbid });
-    
+
     const response = await request(app.getHttpServer())
       .get(`/api/records/mb/${mbid}`)
       .expect(200);
@@ -175,4 +179,4 @@ describe('MusicBrainz Integration (e2e)', () => {
     expect(response.body).toHaveProperty('album', 'Disintegration');
     expect(response.body).toHaveProperty('mbid', mbid);
   });
-}); 
+});

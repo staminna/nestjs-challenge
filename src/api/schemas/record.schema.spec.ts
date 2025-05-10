@@ -135,4 +135,4 @@ describe('Record Schema', () => {
     expect(Array.isArray(record.trackList)).toBe(true);
     expect(record.trackList).toHaveLength(0);
   });
-}); 
+});

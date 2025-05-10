@@ -16,4 +16,4 @@ import { RecordSchema } from './schemas/record.schema';
   providers: [OrderService],
   exports: [OrderService],
 })
-export class OrderModule {} 
+export class OrderModule {}

@@ -44,7 +44,10 @@ export class Record extends Document {
   @Prop({ required: false })
   mbid?: string;
 
-  @Prop({ type: [{ title: String, position: String, duration: Number }], default: [] })
+  @Prop({
+    type: [{ title: String, position: String, duration: Number }],
+    default: [],
+  })
   trackList: Track[];
 }
 

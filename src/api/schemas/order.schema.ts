@@ -13,4 +13,4 @@ export class Order extends Document {
   created: Date;
 }
 
-export const OrderSchema = SchemaFactory.createForClass(Order); 
+export const OrderSchema = SchemaFactory.createForClass(Order);
