@@ -151,19 +151,6 @@ export class RecordService {
       query.category = category;
     }
 
-    // Create text index for more performant full-text search if it doesn't exist
-    try {
-      const indexExists = await this.recordModel.collection.indexExists('textIndex');
-      if (!indexExists) {
-        await this.recordModel.collection.createIndex(
-          { artist: 'text', album: 'text', category: 'text' },
-          { name: 'textIndex' }
-        );
-      }
-    } catch (error) {
-      this.logger.error(`Error creating text index: ${error.message}`);
-    }
-
     // Parse fields for projection to reduce data transfer
     let projection = {};
     if (fields) {
@@ -345,5 +332,13 @@ export class RecordService {
 
   private delay(ms: number): Promise<void> {
     return new Promise(resolve => setTimeout(resolve, ms));
+  }
+
+  async createTextIndex() {
+    try {
+      this.logger.log('Text indexes are defined at schema level');
+    } catch (error) {
+      this.logger.error(`Error with text index: ${error.message}`);
+    }
   }
 }
