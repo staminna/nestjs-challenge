@@ -49,6 +49,9 @@ export class Record extends Document {
     default: [],
   })
   trackList: Track[];
+
+  @Prop({ default: false })
+  isUserCreated: boolean;
 }
 
 export const RecordSchema = SchemaFactory.createForClass(Record);

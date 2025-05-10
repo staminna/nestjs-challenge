@@ -8,6 +8,8 @@ import { UpdateRecordRequestDTO } from '../dtos/update-record.request.dto';
 import { CACHE_MANAGER } from '@nestjs/cache-manager';
 import { Cache } from 'cache-manager';
 import * as xml2js from 'xml2js';
+import * as path from 'path';
+import * as fs from 'fs';
 
 @Injectable()
 export class RecordService {
@@ -58,7 +60,10 @@ export class RecordService {
     // Instead of resetting the entire cache, just clear the records list cache
     await this.cacheManager.del(this.CACHE_PREFIX.RECORDS);
 
-    return await this.recordModel.create(createRecordDto);
+    return await this.recordModel.create({
+      ...createRecordDto,
+      isUserCreated: true  // Mark as user-created
+    });
   }
 
   async update(
@@ -138,18 +143,20 @@ export class RecordService {
     page: number;
     totalPages: number;
   }> {
+    // No filters by default - show all records
+    const query: any = {};
+
     // Generate a cache key based on query parameters
     const cacheKey = `records:${q || ''}:${artist || ''}:${album || ''}:${format || ''}:${category || ''}:${page}:${limit}:${fields || ''}`;
 
-    // Try to get from cache first
-    const cachedResult = await this.cacheManager.get(cacheKey);
-    if (cachedResult) {
-      this.logger.log(`Cache hit for query ${cacheKey}`);
-      return cachedResult as any;
-    }
+    // Try to get from cache first - but disable for debugging
+    // const cachedResult = await this.cacheManager.get(cacheKey);
+    // if (cachedResult) {
+    //   this.logger.log(`Cache hit for query ${cacheKey}`);
+    //   return cachedResult as any;
+    // }
 
     const skip = (page - 1) * limit;
-    const query: any = {};
 
     // Build query filters using MongoDB syntax instead of in-memory filtering
     if (q) {
@@ -187,6 +194,8 @@ export class RecordService {
 
     // Execute the optimized query with projection and lean() for better performance
     try {
+      this.logger.log(`Executing query: ${JSON.stringify(query)}`);
+
       // Use Promise.all to run queries in parallel
       const [records, total] = await Promise.all([
         this.recordModel
@@ -197,6 +206,8 @@ export class RecordService {
           .exec(),
         this.recordModel.countDocuments(query).exec(),
       ]);
+
+      this.logger.log(`Found ${records.length} records out of ${total} total`);
 
       const result = {
         records,
@@ -386,5 +397,50 @@ export class RecordService {
 
   async findAllNoPagination() {
     return this.recordModel.find().lean().exec();
+  }
+
+  async seedFromJson(): Promise<Record[]> {
+    try {
+      const dataPath = path.join(__dirname, '../../../data.json');
+      this.logger.log(`Loading seed data from: ${dataPath}`);
+      
+      // Check if file exists
+      if (!fs.existsSync(dataPath)) {
+        this.logger.error(`Seed file not found at: ${dataPath}`);
+        throw new Error(`Seed file not found at: ${dataPath}`);
+      }
+      
+      const raw = fs.readFileSync(dataPath, 'utf-8');
+      const records = JSON.parse(raw);
+      
+      this.logger.log(`Loaded ${records.length} records from seed file`);
+      
+      // Mark all records as non-user created
+      const recordsWithFlag = records.map(record => ({
+        ...record,
+        isUserCreated: false
+      }));
+      
+      // Insert records but ignore duplicates
+      const insertedRecords = await this.recordModel.insertMany(recordsWithFlag, { 
+        ordered: false // Continue processing even if some documents fail
+      }).catch(err => {
+        // Handle duplicate key errors and return already inserted records
+        if (err.code === 11000) {
+          this.logger.warn('Some records were already in the database and were skipped');
+          return err.insertedDocs || [];
+        }
+        throw err;
+      });
+      
+      // Clear the cache
+      await this.cacheManager.del(this.CACHE_PREFIX.RECORDS);
+      
+      this.logger.log(`Seeded ${insertedRecords.length} records from data.json`);
+      return insertedRecords;
+    } catch (error) {
+      this.logger.error(`Error seeding records: ${error.message}`);
+      throw error;
+    }
   }
 }

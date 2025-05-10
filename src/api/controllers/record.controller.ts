@@ -202,4 +202,12 @@ export class RecordController {
     }
     return record;
   }
+
+  @Post('seed')
+  @ApiOperation({ summary: 'Manually seed records from data.json' })
+  @ApiResponse({ status: 201, description: 'Records seeded successfully' })
+  async seedRecords() {
+    const result = await this.recordService.seedFromJson();
+    return { message: 'Records seeded successfully', count: result.length };
+  }
 }
