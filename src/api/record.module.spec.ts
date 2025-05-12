@@ -41,7 +41,7 @@ describe('RecordModule', () => {
           provide: getModelToken(Record.name),
           useValue: mockModel,
         },
-        RecordSeeder,
+        // RecordSeeder,
       ],
       controllers: [RecordController],
     })

@@ -7,6 +7,40 @@ import { RecordCategory, RecordFormat } from '../schemas/record.enum';
 import { HttpService } from '@nestjs/axios';
 import { of } from 'rxjs';
 
+// Mock the global fetch
+global.fetch = jest.fn().mockImplementation(() =>
+  Promise.resolve({
+    ok: true,
+    status: 200,
+    text: () =>
+      Promise.resolve(`
+      <metadata>
+        <release>
+          <title>Abbey Road</title>
+          <artist-credit>
+            <name-credit>
+              <artist>
+                <name>The Beatles</name>
+              </artist>
+            </name-credit>
+          </artist-credit>
+          <media>
+            <track-list>
+              <track>
+                <position>1</position>
+                <recording>
+                  <title>Come Together</title>
+                </recording>
+                <length>259733</length>
+              </track>
+            </track-list>
+          </media>
+        </release>
+      </metadata>
+    `),
+  }),
+);
+
 describe('RecordService', () => {
   let service: RecordService;
   let mockModel: any;
@@ -28,6 +62,9 @@ describe('RecordService', () => {
         exec: jest.fn().mockResolvedValue({}),
       }),
       create: jest.fn().mockResolvedValue({}),
+      findOne: jest.fn().mockReturnValue({
+        exec: jest.fn().mockResolvedValue(null),
+      }),
     };
 
     mockCacheManager = {
@@ -37,7 +74,14 @@ describe('RecordService', () => {
     };
 
     mockHttpService = {
-      get: jest.fn().mockReturnValue(of({ data: {} })),
+      get: jest.fn().mockReturnValue(
+        of({
+          data: {
+            artist: 'The Beatles',
+            album: 'Abbey Road',
+          },
+        }),
+      ),
     };
 
     const module: TestingModule = await Test.createTestingModule({
@@ -59,23 +103,21 @@ describe('RecordService', () => {
     }).compile();
 
     service = module.get<RecordService>(RecordService);
+
+    // Reset fetch mock for each test
+    (global.fetch as jest.Mock).mockClear();
   });
 
   it('should be defined', () => {
     expect(service).toBeDefined();
   });
 
-  // Add test cases that use the mock data
   it('should fetch data from external service', async () => {
-    const testData = { data: { title: 'Test Record' } };
-    mockHttpService.get.mockReturnValue(of(testData));
-
     const result = await service.fetchMusicBrainzDataPublic('test-mbid');
     expect(result).toBeDefined();
-    expect(mockHttpService.get).toHaveBeenCalled();
+    expect(global.fetch).toHaveBeenCalled();
   });
 
-  // Add more test cases using the mock data
   it('should create a record', async () => {
     const createRecordDto = {
       artist: 'The Beatles',
@@ -105,38 +147,6 @@ describe('RecordService', () => {
   });
 
   it('should fetch MusicBrainz data', async () => {
-    const mockResponse = {
-      data: {
-        metadata: {
-          release: {
-            title: 'Abbey Road',
-            'artist-credit': {
-              'name-credit': {
-                artist: {
-                  name: 'The Beatles',
-                },
-              },
-            },
-            media: {
-              'track-list': {
-                track: [
-                  {
-                    position: '1',
-                    recording: {
-                      title: 'Come Together',
-                    },
-                    length: '259733',
-                  },
-                ],
-              },
-            },
-          },
-        },
-      },
-    };
-
-    mockHttpService.get.mockReturnValue(of(mockResponse));
-
     const result = await service.fetchMusicBrainzDataPublic('test-mbid');
     expect(result).toBeDefined();
     expect(result.artist).toBe('The Beatles');

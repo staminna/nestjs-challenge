@@ -10,6 +10,7 @@ import {
   NotFoundException,
   InternalServerErrorException,
   HttpCode,
+  Res,
 } from '@nestjs/common';
 import { ApiOperation, ApiQuery, ApiResponse, ApiParam } from '@nestjs/swagger';
 import { RecordService } from '../services/record.service';
@@ -17,6 +18,7 @@ import { CreateRecordRequestDTO } from '../dtos/create-record.request.dto';
 import { UpdateRecordRequestDTO } from '../dtos/update-record.request.dto';
 import { RecordCategory, RecordFormat } from '../schemas/record.enum';
 import { Record } from '../schemas/record.schema';
+import { Response } from 'express';
 
 @Controller('records')
 export class RecordController {
@@ -209,5 +211,86 @@ export class RecordController {
   async seedRecords() {
     const result = await this.recordService.seedFromJson();
     return { message: 'Records seeded successfully', count: result.length };
+  }
+
+  @Get('musicbrainz/:mbid')
+  @ApiOperation({ summary: 'Fetch data from MusicBrainz API for a given MBID' })
+  @ApiParam({ name: 'mbid', description: 'MusicBrainz Identifier' })
+  @ApiResponse({
+    status: 200,
+    description: 'MusicBrainz data successfully retrieved',
+  })
+  @ApiResponse({ status: 404, description: 'MusicBrainz data not found' })
+  async getMusicBrainzData(@Param('mbid') mbid: string): Promise<any> {
+    const data = await this.recordService.fetchMusicBrainzDataPublic(mbid);
+    if (!data) {
+      throw new NotFoundException(
+        `MusicBrainz data not found for MBID: ${mbid}`,
+      );
+    }
+    return data;
+  }
+
+  @Get('musicbrainz/search/artists')
+  @ApiOperation({
+    summary: 'Search for artists in MusicBrainz (for autocomplete)',
+  })
+  @ApiQuery({
+    name: 'q',
+    description: 'Artist name to search for',
+    required: true,
+    type: String,
+  })
+  @ApiResponse({ status: 200, description: 'Artists found successfully' })
+  async searchArtists(@Query('q') query: string): Promise<any[]> {
+    if (!query || query.trim().length < 2) {
+      return [];
+    }
+    return this.recordService.searchMusicBrainzArtists(query);
+  }
+
+  @Get('musicbrainz/artists/:id/releases')
+  @ApiOperation({
+    summary: 'Get releases for a specific artist from MusicBrainz',
+  })
+  @ApiParam({ name: 'id', description: 'MusicBrainz artist ID' })
+  @ApiResponse({ status: 200, description: 'Releases found successfully' })
+  @ApiResponse({ status: 404, description: 'Artist not found' })
+  async getArtistReleases(@Param('id') artistId: string): Promise<any[]> {
+    if (!artistId) {
+      throw new NotFoundException('Artist ID is required');
+    }
+    const releases =
+      await this.recordService.searchMusicBrainzReleases(artistId);
+    if (!releases || releases.length === 0) {
+      throw new NotFoundException(
+        `No releases found for artist ID: ${artistId}`,
+      );
+    }
+    return releases;
+  }
+
+  @Get('musicbrainz/releases/:mbid/xml')
+  @ApiOperation({ summary: 'Get raw XML data for a release by MBID' })
+  @ApiParam({ name: 'mbid', description: 'MusicBrainz release ID' })
+  @ApiResponse({
+    status: 200,
+    description: 'XML data retrieved successfully',
+    type: String,
+  })
+  @ApiResponse({ status: 404, description: 'Release not found' })
+  async getReleaseXml(
+    @Param('mbid') mbid: string,
+    @Res() res: Response,
+  ): Promise<any> {
+    try {
+      const xmlData = await this.recordService.getReleaseAsXML(mbid);
+      res.set('Content-Type', 'application/xml');
+      return res.send(xmlData);
+    } catch (error) {
+      throw new NotFoundException(
+        `Failed to retrieve XML for release: ${error.message}`,
+      );
+    }
   }
 }

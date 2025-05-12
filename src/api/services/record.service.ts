@@ -10,6 +10,7 @@ import { Cache } from 'cache-manager';
 import * as xml2js from 'xml2js';
 import * as path from 'path';
 import * as fs from 'fs';
+import { HttpService } from '@nestjs/axios';
 
 @Injectable()
 export class RecordService {
@@ -26,6 +27,7 @@ export class RecordService {
   constructor(
     @InjectModel('Record') private readonly recordModel: Model<Record>,
     @Inject(CACHE_MANAGER) private cacheManager: Cache,
+    private readonly httpService: HttpService,
   ) {}
 
   async create(createRecordDto: CreateRecordRequestDTO): Promise<Record> {
@@ -62,7 +64,7 @@ export class RecordService {
 
     return await this.recordModel.create({
       ...createRecordDto,
-      isUserCreated: true  // Mark as user-created
+      isUserCreated: true, // Mark as user-created
     });
   }
 
@@ -403,43 +405,221 @@ export class RecordService {
     try {
       const dataPath = path.join(__dirname, '../../../data.json');
       this.logger.log(`Loading seed data from: ${dataPath}`);
-      
+
       // Check if file exists
       if (!fs.existsSync(dataPath)) {
         this.logger.error(`Seed file not found at: ${dataPath}`);
         throw new Error(`Seed file not found at: ${dataPath}`);
       }
-      
+
       const raw = fs.readFileSync(dataPath, 'utf-8');
       const records = JSON.parse(raw);
-      
+
       this.logger.log(`Loaded ${records.length} records from seed file`);
-      
+
       // Mark all records as non-user created
-      const recordsWithFlag = records.map(record => ({
+      const recordsWithFlag = records.map((record) => ({
         ...record,
-        isUserCreated: false
+        isUserCreated: false,
       }));
-      
+
       // Insert records but ignore duplicates
-      const insertedRecords = await this.recordModel.insertMany(recordsWithFlag, { 
-        ordered: false // Continue processing even if some documents fail
-      }).catch(err => {
-        // Handle duplicate key errors and return already inserted records
-        if (err.code === 11000) {
-          this.logger.warn('Some records were already in the database and were skipped');
-          return err.insertedDocs || [];
-        }
-        throw err;
-      });
-      
+      const insertedRecords = await this.recordModel
+        .insertMany(recordsWithFlag, {
+          ordered: false, // Continue processing even if some documents fail
+        })
+        .catch((err) => {
+          // Handle duplicate key errors and return already inserted records
+          if (err.code === 11000) {
+            this.logger.warn(
+              'Some records were already in the database and were skipped',
+            );
+            return err.insertedDocs || [];
+          }
+          throw err;
+        });
+
       // Clear the cache
       await this.cacheManager.del(this.CACHE_PREFIX.RECORDS);
-      
-      this.logger.log(`Seeded ${insertedRecords.length} records from data.json`);
+
+      this.logger.log(
+        `Seeded ${insertedRecords.length} records from data.json`,
+      );
       return insertedRecords;
     } catch (error) {
       this.logger.error(`Error seeding records: ${error.message}`);
+      throw error;
+    }
+  }
+
+  // Add this new method to search for artists by name
+  async searchMusicBrainzArtists(query: string): Promise<any[]> {
+    if (!query || query.trim().length < 2) {
+      return [];
+    }
+
+    const cacheKey = `${this.CACHE_PREFIX.MUSICBRAINZ}search:artist:${query}`;
+    const cachedResults = await this.cacheManager.get(cacheKey);
+
+    if (cachedResults) {
+      this.logger.log(`Cache hit for artist search: ${query}`);
+      return cachedResults as any[];
+    }
+
+    try {
+      // Add delay to respect MusicBrainz rate limiting
+      await this.delay(1000);
+
+      // Encode the query parameter to handle special characters
+      const encodedQuery = encodeURIComponent(query);
+      const url = `${this.MUSICBRAINZ_API_BASE}/artist?query=${encodedQuery}&limit=10&fmt=json`;
+
+      this.logger.log(`Searching MusicBrainz for artists matching: ${query}`);
+
+      const response = await fetch(url, {
+        headers: {
+          'User-Agent': this.USER_AGENT,
+          Accept: 'application/json',
+        },
+      });
+
+      if (!response.ok) {
+        throw new Error(
+          `MusicBrainz API responded with status: ${response.status}`,
+        );
+      }
+
+      const data = await response.json();
+
+      // Extract and format the artist data
+      const artists =
+        data.artists?.map((artist) => ({
+          id: artist.id,
+          name: artist.name,
+          type: artist.type,
+          country: artist.country,
+          score: artist.score,
+          disambiguation: artist.disambiguation,
+        })) || [];
+
+      // Sort by score (relevance)
+      artists.sort((a, b) => b.score - a.score);
+
+      // Cache the results for 1 hour
+      await this.cacheManager.set(cacheKey, artists, 60 * 60);
+
+      return artists;
+    } catch (error) {
+      this.logger.error(
+        `Error searching MusicBrainz artists: ${error.message}`,
+      );
+      return [];
+    }
+  }
+
+  // Add this method to search for releases (albums) by artist ID
+  async searchMusicBrainzReleases(artistId: string): Promise<any[]> {
+    if (!artistId) {
+      return [];
+    }
+
+    const cacheKey = `${this.CACHE_PREFIX.MUSICBRAINZ}releases:artist:${artistId}`;
+    const cachedResults = await this.cacheManager.get(cacheKey);
+
+    if (cachedResults) {
+      this.logger.log(`Cache hit for artist releases: ${artistId}`);
+      return cachedResults as any[];
+    }
+
+    try {
+      // Add delay to respect MusicBrainz rate limiting
+      await this.delay(1000);
+
+      const url = `${this.MUSICBRAINZ_API_BASE}/release?artist=${artistId}&limit=25&fmt=json`;
+
+      this.logger.log(`Fetching releases for artist ID: ${artistId}`);
+
+      const response = await fetch(url, {
+        headers: {
+          'User-Agent': this.USER_AGENT,
+          Accept: 'application/json',
+        },
+      });
+
+      if (!response.ok) {
+        throw new Error(
+          `MusicBrainz API responded with status: ${response.status}`,
+        );
+      }
+
+      const data = await response.json();
+
+      // Extract and format the release data
+      const releases =
+        data.releases?.map((release) => ({
+          id: release.id,
+          title: release.title,
+          status: release.status,
+          date: release.date,
+          country: release.country,
+          trackCount: release['track-count'],
+          disambiguation: release.disambiguation,
+        })) || [];
+
+      // Cache the results for 1 day
+      await this.cacheManager.set(cacheKey, releases, 60 * 60 * 24);
+
+      return releases;
+    } catch (error) {
+      this.logger.error(
+        `Error fetching MusicBrainz releases: ${error.message}`,
+      );
+      return [];
+    }
+  }
+
+  async getReleaseAsXML(mbid: string): Promise<string> {
+    if (!mbid) {
+      throw new Error('MBID is required');
+    }
+
+    const cacheKey = `${this.CACHE_PREFIX.MUSICBRAINZ}xml:${mbid}`;
+    const cachedXml = await this.cacheManager.get<string>(cacheKey);
+
+    if (cachedXml) {
+      this.logger.log(`Cache hit for XML data: ${mbid}`);
+      return cachedXml;
+    }
+
+    try {
+      // Add delay to respect MusicBrainz rate limiting
+      await this.delay(1000);
+
+      const url = `${this.MUSICBRAINZ_API_BASE}/release/${mbid}?inc=recordings+artists+release-groups+labels+media`;
+
+      this.logger.log(`Fetching XML for release ${mbid}`);
+
+      const response = await fetch(url, {
+        headers: {
+          'User-Agent': this.USER_AGENT,
+          Accept: 'application/xml',
+        },
+      });
+
+      if (!response.ok) {
+        throw new Error(
+          `MusicBrainz API responded with status: ${response.status}`,
+        );
+      }
+
+      const xmlText = await response.text();
+
+      // Cache the raw XML for 1 day
+      await this.cacheManager.set(cacheKey, xmlText, 60 * 60 * 24);
+
+      return xmlText;
+    } catch (error) {
+      this.logger.error(`Error fetching XML for release: ${error.message}`);
       throw error;
     }
   }

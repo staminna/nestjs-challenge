@@ -10,13 +10,15 @@ describe('Record Schema', () => {
   beforeEach(async () => {
     const module: TestingModule = await Test.createTestingModule({
       imports: [
-        MongooseModule.forRoot('mongodb://localhost/test'),
+        MongooseModule.forRoot('mongodb://127.0.0.1:27017/test', {
+          connectTimeoutMS: 1000,
+        }),
         MongooseModule.forFeature([{ name: 'Record', schema: RecordSchema }]),
       ],
     }).compile();
 
     model = module.get<Model<Record>>(getModelToken('Record'));
-  });
+  }, 10000);
 
   it('should create a valid record', () => {
     const record = new model({

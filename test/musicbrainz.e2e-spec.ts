@@ -8,6 +8,7 @@ import { RecordService } from '../src/api/services/record.service';
 import { Record } from '../src/api/schemas/record.schema';
 import { getModelToken } from '@nestjs/mongoose';
 import { CACHE_MANAGER } from '@nestjs/cache-manager';
+import { HttpModule } from '@nestjs/axios';
 
 describe('MusicBrainz Integration (e2e)', () => {
   let app: INestApplication;
@@ -20,7 +21,7 @@ describe('MusicBrainz Integration (e2e)', () => {
 
   beforeAll(async () => {
     const moduleFixture: TestingModule = await Test.createTestingModule({
-      imports: [AppModule],
+      imports: [AppModule, HttpModule],
     })
       .overrideProvider(CACHE_MANAGER)
       .useValue({

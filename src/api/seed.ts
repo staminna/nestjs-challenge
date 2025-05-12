@@ -17,9 +17,9 @@ export class RecordSeeder implements OnModuleInit {
       const dataPath = path.join(__dirname, '../../data.json');
       const raw = fs.readFileSync(dataPath, 'utf-8');
       const records = JSON.parse(raw);
-      const recordsWithFlag = records.map(record => ({
+      const recordsWithFlag = records.map((record) => ({
         ...record,
-        isUserCreated: false
+        isUserCreated: false,
       }));
       await this.recordModel.insertMany(recordsWithFlag);
       console.log('Seeded records from data.json');
